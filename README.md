@@ -39,5 +39,3 @@ python train_autoint_radiance_field.py --config /path/to/config/file --render_mo
 ```
 
 Ở đây, tham số `--render_model` cho biết thư mục nơi mô hình và checkpoints được lưu. Ví dụ: nó sẽ là `../logs/blender_lego` cho tập dữ liệu mặc định của Blender. Sau đó, bạn có thể tìm thấy số epoch bằng cách xem số của tên tệp checkpoints đã lưu trong `../logs/blender_lego/checkpoints/`. Cuối cùng, `--render_output` sẽ chỉ định một thư mục nơi các hình ảnh hiển thị đầu ra sẽ được tạo.
-
-Hiện tại, nhóm đã huấn luyện sẵn mô hình tính tích phân cho hàm 1 biến và mô hình cho bài toán chụp cắt lớp thưa và lưu ở thư mục `log`. 
