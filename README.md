@@ -2,7 +2,7 @@
 
 ## Cài đặt môi trường 
 ```
-conda env tạo -f environment.yml
+conda env create -f environment.yml
 conda activate autoint
 ```
 
@@ -38,4 +38,4 @@ Kết xuất từ một mô hình đã được huấn luyện có thể đượ
 python train_autoint_radiance_field.py --config /path/to/config/file --render_model ../logs/path/to/log/directory <epoch number> --render_output /path/to/output/folder
 ```
 
-Ở đây, tham số `--render_model` cho biết thư mục nơi mô hình và checkpoints được lưu. Ví dụ: nó sẽ là `../logs/blender_lego` cho tập dữ liệu mặc định của Blender. Sau đó, bạn có thể tìm thấy số epoch bằng cách xem số của tên tệp checkpoints đã lưu trong `../logs/blender_lego/checkpoints/`. Cuối cùng, `--render_output` sẽ chỉ định một thư mục nơi các hình ảnh hiển thị đầu ra sẽ được tạo.
+Ở đây, tham số `--render_model` cho biết thư mục nơi mô hình và checkpoints được lưu. Ví dụ: nó sẽ là `../logs/blender_lego` cho tập dữ liệu mặc định của Blender. Sau đó, bạn có thể tìm thấy số epoch bằng cách xem số của tên tệp checkpoints đã lưu trong `../logs/blender_lego/checkpoints/`. Cuối cùng, `--render_output` sẽ chỉ định một thư mục nơi các hình ảnh đầu ra sẽ được lưu.
