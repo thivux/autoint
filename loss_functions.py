@@ -28,7 +28,7 @@ def tomo_radiance_sigma_rgb_loss(model_outputs, gt, dataloader=None,
     if 'combined' in model_outputs:
         pred_sigma = model_outputs['combined']['model_out']['output'][..., -1:]
         pred_rgb = model_outputs['combined']['model_out']['output'][..., :-1]
-    else:
+    else: # we're in this case 
         pred_sigma = model_outputs['sigma']['model_out']['output']
         pred_rgb = model_outputs['rgb']['model_out']['output']
 

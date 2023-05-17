@@ -7,6 +7,13 @@ import numpy as np
 import os
 import shutil
 
+import logging
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+file_handler = logging.FileHandler('../logs/training.log')
+file_handler.setFormatter(formatter)
+logger.addHandler(file_handler)
 
 def train(model, train_dataloader, epochs, lr, steps_til_summary, epochs_til_checkpoint, model_dir,
           loss_fn, summary_fn,
@@ -256,8 +263,11 @@ def train_wchunks(models, train_dataloader, epochs, lr, steps_til_summary, epoch
 
                     # forward pass through model
                     chunk_model_outputs = {key: model(chunked_model_input) for key, model in models.items()}
+                    logger.debug(f'chunk_model_outputs: \n{chunk_model_outputs}')
+                    logger.debug(f'chunked_model_outputs items: \n{chunk_model_outputs.keys()}')
                     losses = loss_fn(chunk_model_outputs, chunked_gt,
                                      dataloader=train_dataloader)
+                    logger.debug(f'losses: \n{losses}')
 
                     # loss from forward pass
                     train_loss = 0.

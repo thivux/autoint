@@ -1,6 +1,14 @@
 import torch
 
 
+import logging
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+file_handler = logging.FileHandler('../logs/loss_functions.log')
+file_handler.setFormatter(formatter)
+logger.addHandler(file_handler)
+
 def cumprod_exclusive(tensor, dim=-2):
     cumprod = torch.cumprod(tensor, dim)
     cumprod = torch.roll(cumprod, 1, dim)
@@ -22,12 +30,22 @@ def compute_tomo_radiance(pred_weights, pred_rgb):
 
 def compute_transmittance_weights_piecewise(pred_sigma, t_intervals, ncuts=32):
     shape_in = pred_sigma.shape
+    logger.debug(f"shape_in: {shape_in}") 
     *others, nsamples_per_ray, ndims = shape_in
+    logger.debug(f'nsamples_per_ray: {nsamples_per_ray}')
+    logger.debug(f'ndims: {ndims}')
     ncuts_per_ray = ncuts
+    logger.debug(f'num_cuts_per_ray: {ncuts_per_ray}')
     nsamples_per_cut = nsamples_per_ray//ncuts_per_ray
+    logger.debug(f'nsamples_per_cut: {nsamples_per_cut}')
 
+    logger.debug(f'pred_sigma.shape before reshape: {pred_sigma.shape}')
     pred_sigma = pred_sigma.reshape(-1, ncuts_per_ray, nsamples_per_cut, ndims)
+    logger.debug(f'pred_sigma.shape after reshape: {pred_sigma.shape}')
+
+    logger.debug(f't_intervals.shape before reshape: {t_intervals.shape}')
     t_intervals = t_intervals.reshape(-1, ncuts_per_ray, nsamples_per_cut, ndims)
+    logger.debug(f't_intervals.shape after reshape: {t_intervals.shape}')
 
     pred_sigma_mean = torch.relu(torch.mean(pred_sigma, dim=-2))
     t_intervals_sum = torch.sum(t_intervals, dim=-2)

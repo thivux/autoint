@@ -14,6 +14,18 @@ import coord_transforms
 import rot_utils
 
 
+import logging
+
+logger = logging.getLogger(__name__)
+
+logger.setLevel(logging.DEBUG)
+
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+file_handler = logging.FileHandler(filename='../logs/dataio.log')
+file_handler.setFormatter(formatter)
+
+logger.addHandler(file_handler)
+
 class Implicit1DWrapper(torch.utils.data.Dataset):
     def __init__(self, range, fn, grad_fn=None, integral_fn=None, sampling_density=100,
                  train_every=10, jitter=False):
@@ -570,9 +582,12 @@ class NerfBlenderDataset(Dataset):
                  select_idx=None,
                  testskip=1, resize_to=None, final_render=False,
                  ref_rot=None, d_rot=0, bounds=((-2, 2), (-2, 2), (0, 2))):
+        
+        logger.debug(f'in init of NerfBlenderDataset')
         self.mode = mode
         self.basedir = basedir
         self.resize_to = resize_to
+        logger.debug(f'resize to: {resize_to}')
         self.final_render = final_render
         self.bounds = bounds
 
@@ -593,8 +608,8 @@ class NerfBlenderDataset(Dataset):
         self.all_poses = {}
         for s in splits:
             meta = metas[s]
-            imgs = []
-            poses = []
+            imgs = [] # tensor representation of images
+            poses = [] # info about camera position and orientation
 
             if s == 'train' or testskip == 0:
                 skip = 1
@@ -608,7 +623,9 @@ class NerfBlenderDataset(Dataset):
 
                 fname = os.path.join(basedir, frame['file_path'] + '.png')
                 img = Image.open(fname)
-                pose = torch.from_numpy(np.array(frame['transform_matrix'], dtype=np.float32))
+                
+                # frame['transform_matrix'] is a 4x4 matrix to transform from camera coordinates to world coordinates 
+                pose = torch.from_numpy(np.array(frame['transform_matrix'], dtype=np.float32)) 
 
                 if ref_rot is None:
                     img_t = transforms(img)
@@ -628,14 +645,20 @@ class NerfBlenderDataset(Dataset):
             self.poses = [torch.from_numpy(self.pose_spherical(angle, -30.0, 4.0)).float()
                           for angle in np.linspace(-180, 180, 40 + 1)[:-1]]
 
-        H, W = imgs[0].shape[:2]
+        H, W = imgs[0].shape[:2] # H = W = img_size in config file 
+        logger.debug(f'img shape: {imgs[0].shape}')
+
         camera_angle_x = float(meta['camera_angle_x'])
+        logger.debug(f'camera angle x: {camera_angle_x}')
+
         focal = .5 * W / np.tan(.5 * camera_angle_x)
+        logger.debug(f'focal: {focal}')
         self.camera_params = {'H': H, 'W': W,
                               'camera_angle_x': camera_angle_x,
                               'focal': focal,
                               'near': 2.0,
                               'far': 6.0}
+        logger.debug(f'camera params: {self.camera_params}\n')
         self.img_shape = imgs[0].shape
 
     # adapted from https://github.com/krrish94/nerf-pytorch
@@ -701,11 +724,19 @@ class Implicit6DMultiviewDataWrapper(Dataset):
                  sobol_ray_sampling=False,
                  num_workers=4):
 
+        logger.debug("at init of Implicit6DMultiviewDataWrapper")
+
         self.dataset = dataset
+        logger.debug(f'dataset: {dataset}')
+
         self.num_workers = num_workers
+        logger.debug(f'num_workers: {num_workers}')
 
         self.img_shape = img_shape
+        logger.debug(f'img_shape: {img_shape}')
+        
         self.camera_params = camera_params
+        logger.debug(f'camera_params: {camera_params}')
 
         self.use_ndc = use_ndc
         self.use_near_far_shift = use_near_far_shift
@@ -713,6 +744,8 @@ class Implicit6DMultiviewDataWrapper(Dataset):
         self.samples_per_view = samples_per_view
         self.default_samples_per_view = samples_per_view
         self.samples_per_ray = samples_per_ray
+        logger.debug(f'samples_per_ray: {samples_per_ray}')
+        logger.debug(f'samples_per_view: {samples_per_view}\n')
 
         self._generate_rays_normalized()
         self._precompute_rays()
@@ -732,13 +765,19 @@ class Implicit6DMultiviewDataWrapper(Dataset):
             self.samples_per_view = self.default_samples_per_view
             self.is_logging = False
         else:
-            self.samples_per_view = self.img_shape[0] * self.img_shape[1]
+            self.samples_per_view = self.img_shape[0] * self.img_shape[1] # number of rays = number of pixels
             self.is_logging = True
 
     def _generate_rays_normalized(self):
-        rows = torch.arange(0, self.img_shape[0], dtype=torch.float32)
-        cols = torch.arange(0, self.img_shape[1], dtype=torch.float32)
-        g_rows, g_cols = torch.meshgrid(rows, cols)
+        rows = torch.arange(0, self.img_shape[0], dtype=torch.float32) # shape [64], [0, 1, ..., 63] 
+        logger.debug(f'rows: {rows}') 
+        logger.debug(f'rows.shape: {rows.shape}')
+        cols = torch.arange(0, self.img_shape[1], dtype=torch.float32) # shape [64], [0, 1, ..., 63]
+        logger.debug(f'cols: {cols}')
+        logger.debug(f'cols.shape: {cols.shape}')
+        g_rows, g_cols = torch.meshgrid(rows, cols) # shape [64, 64], [64, 64]
+        logger.debug(f'g_rows, g_cols: {g_rows, g_cols}')
+        logger.debug(f'g_rows.shape, g_cols.shape: {g_rows.shape, g_cols.shape}')
 
         W = self.camera_params['W']
         H = self.camera_params['H']
@@ -747,11 +786,17 @@ class Implicit6DMultiviewDataWrapper(Dataset):
         self.norm_rays = torch.stack([(g_cols-.5*W)/f,
                                       -(g_rows-.5*H)/f,
                                       -torch.ones_like(g_rows)],
-                                     dim=2).view(-1, 3).permute(1, 0)
+                                     dim=2).view(-1, 3).permute(1, 0) # [3, 4096]
+
+        logger.debug("in _generate_rays_normalized")
+        logger.debug(f'norm_rays: {self.norm_rays}')
+        logger.debug(f'norm_rays.shape: {self.norm_rays.shape}')
 
         self.num_rays_per_view = self.norm_rays.shape[1]
+        logger.debug(f'num_rays_per_view: {self.num_rays_per_view}\n')
 
     def _precompute_rays(self):
+        logger.debug('in precomputing rays...')
         img_list = []
         pose_list = []
 
@@ -766,6 +811,7 @@ class Implicit6DMultiviewDataWrapper(Dataset):
         pose_flatrotmats_list = []
 
         print('Precomputing rays...')
+        count =  0
         for img_pose in tqdm(self.dataset):
             img = img_pose['img']
             img_list.append(img)
@@ -782,6 +828,16 @@ class Implicit6DMultiviewDataWrapper(Dataset):
             ray_orgs = pose[:3, 3].repeat((self.num_rays_per_view, 1))
             ray_orgs_list.append(ray_orgs)
 
+            if count == 0:  # only log the first image 
+                logger.debug(f'img shape: {img.shape}') # [64, 64, 4]
+                logger.debug(f'pose shape: {pose.shape}') # [4, 4]
+                logger.debug(f'ray_dirs: {ray_dirs[:3, :]}')
+                logger.debug(f'ray_dirs shape: {ray_dirs.shape}') # [4096, 3]
+                logger.debug(f'ray_orgs shape: {ray_orgs.shape}]\n') # [4096, 3]
+                logger.debug(f'ray_orgs: {ray_orgs[:3, :]}')
+
+            count += 1
+
             ray_norm_dirs = ray_dirs / torch.sqrt(torch.sum(ray_dirs**2, dim=-1, keepdim=True))
             ray_norm_dirs_list.append(ray_norm_dirs)
             ray_up = ray_up.permute(1, 0)
@@ -794,6 +850,8 @@ class Implicit6DMultiviewDataWrapper(Dataset):
 
             pose_rotmat = pose[0:3, 0:3][None, :, :]
             pose_flatrotmats_list.append(pose_rotmat.reshape(-1, 9))
+
+        logger.debug(f'count aka number of images: {count}\n') # 100 = n_imgs
 
         self.all_imgs = torch.stack(img_list, dim=0)
         self.all_poses = torch.stack(pose_list, dim=0)
@@ -811,12 +869,19 @@ class Implicit6DMultiviewDataWrapper(Dataset):
         return len(self.dataset)
 
     def __getitem__(self, idx):
+        logger.debug('in __getitem__ of 6d datawrapper')
         img_i = self.all_imgs[idx, ...]
+        logger.debug(f'all_imgs shape: {self.all_imgs.shape}')
+        logger.debug(f'img_i shape: {img_i.shape}')
         pose_i = self.all_poses[idx, ...]
+        logger.debug(f'pose_i shape: {pose_i.shape}')
         ray_dirs_i = self.all_ray_dirs[idx, ...]
+        logger.debug(f'ray_dirs_i shape: {ray_dirs_i.shape}')
         ray_orgs_i = self.all_ray_orgs[idx, ...]
+        logger.debug(f'ray_orgs_i shape: {ray_orgs_i.shape}')
         ray_flatrotmats_i = self.all_ray_flatrotmats[idx, ...]
         view_samples_i = img_i.reshape(-1, 4)
+        logger.debug(f'view_samples_i shape: {view_samples_i.shape}')
 
         # Eventually subsample the pixels
         if not self.is_logging:
@@ -851,9 +916,15 @@ class Implicit6DMultiviewDataWrapper(Dataset):
         ray_dirs = ray_dirs[:, None, :]
         ray_orgs = ray_orgs[:, None, :]
 
-        t_vals = torch.linspace(0.0, 1.0, self.samples_per_ray)
+        t_vals = torch.linspace(0.0, 1.0, self.samples_per_ray) # chia deu samples_per_ray khoang tu 0 den 1
+        logger.debug(f't_vals shape: {t_vals.shape}')
+        logger.debug(f't_vals init: {t_vals}')
         t_vals = camera_params['near'] * (1.0 - t_vals) + camera_params['far'] * t_vals
+        logger.debug(f'camera_params near: {camera_params["near"]}')
+        logger.debug(f'camera_params far: {camera_params["far"]}')
+        logger.debug(f't_vals near far transformation: {t_vals}')
         t_vals = t_vals[None, :].repeat(self.samples_per_view, 1)
+        logger.debug(f't_vals repeat: {t_vals}')
 
         mids = 0.5 * (t_vals[..., 1:] + t_vals[..., :-1])
         upper = torch.cat((mids, t_vals[..., -1:]), dim=-1)
@@ -862,9 +933,9 @@ class Implicit6DMultiviewDataWrapper(Dataset):
         # Stratified samples in those intervals.
         t_rand = torch.rand(t_vals.shape)
         t_vals = lower + (upper - lower) * t_rand
-        t = t_vals[..., None]
+        t = t_vals[..., None] # give an extra dimension
 
-        ray_samples = ray_orgs + ray_dirs * t_vals[..., None]
+        ray_samples = ray_orgs + ray_dirs * t_vals[..., None] # tf sao khong + t luon :)
 
         # Compute distance samples from orgs
         dist_samples_to_org = torch.sqrt(torch.sum((ray_samples-ray_orgs)**2, dim=-1, keepdim=True))
@@ -876,7 +947,7 @@ class Implicit6DMultiviewDataWrapper(Dataset):
                    'ray_orientations': ray_flatrotmats[..., 0:6],
                    'ray_directions': ray_dirs,
                    'ray_directions_norm': ray_dirs,
-                   't': t}
+                   't': t} # the distance from the camera to the point on the ray
         meta_dict = {'zs': dist_samples_to_org}
         gt_dict = {'pixel_samples': view_samples}
 

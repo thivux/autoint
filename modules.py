@@ -12,6 +12,13 @@ from diff_operators import jacobian
 from autoint import autograd_modules
 from autoint.session import Session
 
+import logging
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+file_handler = logging.FileHandler('../logs/modules.log')
+file_handler.setFormatter(formatter)
+logger.addHandler(file_handler)
 
 def init_weights_requ(m):
     if type(m) == BatchLinear or type(m) == nn.Linear:
@@ -498,8 +505,19 @@ class RadianceNet(MetaModule):
 
         input_dict = {key: input.clone().detach().requires_grad_(True)
                       for key, input in model_input.items()}
+        # logger.debug(f'input_dict: {input_dict}')
+        logger.debug(f'input_dict ray_origins: {input_dict["ray_origins"]}')
+        logger.debug(f'input dict ray_origins shape: {input_dict["ray_origins"].shape}')
+        logger.debug(f'input_dict ray_directions: {input_dict["ray_directions"]}')
+        logger.debug(f'input_dict ray_directions shape: {input_dict["ray_directions"].shape}')
+        logger.debug(f'input_dict ray_orientations: {input_dict["ray_orientations"]}')
+        logger.debug(f'input_dict ray_orientations shape: {input_dict["ray_orientations"].shape}')
+        logger.debug(f'input_dict ray_directions_norm: {input_dict["ray_directions_norm"]}')
+        logger.debug(f'input_dict ray_directions_norm shape: {input_dict["ray_directions_norm"].shape}')
+        logger.debug(f'input_dict t: {input_dict["t"]}')
+        logger.debug(f'input_dict t shape: {input_dict["t"].shape}')
 
-        input_dict['params'] = params
+        input_dict['params'] = params # None
 
         if self.input_processing_fn is None:
             input_dict_transformed = input_dict
@@ -507,11 +525,13 @@ class RadianceNet(MetaModule):
             input_dict_transformed = self.input_processing_fn(input_dict, sampler=self.sampler,
                                                               return_posts=self.mode == 'integral' and self.use_grad)
 
-        if self.mode == 'grad':
+        if self.mode == 'grad': # training
             out = self.backward_session.compute_graph_fast(input_dict_transformed)
-        elif self.mode == 'integral':
+        elif self.mode == 'integral': # inference
             out = self.session.compute_graph_fast(input_dict_transformed)
 
+        logger.debug(f'out: {out}')
+        logger.debug(f'out shape: {out.shape}')
         output_dict = {'output': out}
         return {'model_in': input_dict_transformed, 'model_out': output_dict}
 
